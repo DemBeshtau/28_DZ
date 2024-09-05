@@ -1,0 +1,16 @@
+---
+- name: Installing postgresql-server-14
+  apt:
+    name:
+      - postgresql
+      - postgresql-contrib
+      - acl
+    state: present
+    update_cache: true
+
+- name: Enabling and starting -postgresql- service
+  service:
+    name: postgresql
+    state: started
+    enabled: true
+...

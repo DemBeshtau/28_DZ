@@ -1,0 +1,88 @@
+---
+- name: Installing base tools
+  apt:
+    name:
+      - python3-pexpect
+      - python3-psycopg2
+    state: present
+    update_cache: true
+
+- name: Creating -replicator- user
+  become: true
+  become_user: postgres
+  postgresql_user:
+    name: '{{ replication_user }}'
+    password: '{{ replicator_password }}'
+    role_attr_flags: replication
+    state: present
+  ignore_errors: true
+  when: (ansible_hostname == "node1")
+
+- name: Halting -postgresql- service on node2
+  service:
+    name: postgresql
+    state: stopped
+  when: (ansible_hostname == "node2")
+
+- name: Copying postgresql.conf file on node1
+  template:
+    src: postgresql.conf.j2
+    dest: /etc/postgresql/14/main/postgresql.conf
+    owner: postgres
+    group: postgres
+    mode: 0600
+  when: (ansible_hostname == "node1")
+
+- name: Copying pg_hba.conf file on node1
+  template:
+    src: pg_hba.conf.j2
+    dest: /etc/postgresql/14/main/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: 0600
+  when: (ansible_hostname == "node1")
+
+- name: Restarting -postgresql- service on node1
+  service:
+    name: postgresql
+    state: restarted
+  when: (ansible_hostname == "node1")
+
+- name: Removing files from data catalog on node2
+  file:
+    path: /var/lib/postgresql/14/main/
+    state: absent
+  when: (ansible_hostname == "node2")
+
+- name: Copying files from master to slave
+  become_user: postgres
+  expect:
+    command: 'pg_basebackup -h {{ master_ip }} -U {{ replication_user }} -p 5432 -D /var/lib/postgresql/14/main/ -R -P'
+    responses:
+      '.*Password*': "{{ replicator_password }}"
+  when: (ansible_hostname == "node2")
+
+- name: Copying postgresql.conf file on node2
+  template:
+    src: postgresql.conf.j2
+    dest: /etc/postgresql/14/main/postgresql.conf
+    owner: postgres
+    group: postgres
+    mode: 0600
+  when: (ansible_hostname == "node2")
+
+- name: Copying pg_hba.conf file on node2
+  template:
+    src: pg_hba.conf.j2
+    dest: /etc/postgresql/14/main/pg_hba.conf
+    owner: postgres
+    group: postgres
+    mode: 0600
+  when: (ansible_hostname == "node2")
+
+- name: Starting -postgresql- service on node2
+  service:
+    name: postgresql
+    state: started
+  when: (ansible_hostname == "node2")
+...

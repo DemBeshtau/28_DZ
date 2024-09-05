@@ -1,0 +1,14 @@
+---
+- name: Installing postgres and setting up replication
+  hosts: node1,node2
+  become: yes
+  roles:
+    - install_postgres
+    - postgres_replication
+
+- name: Setting up backup
+  hosts: all
+  become: yes
+  roles:
+    - install_barman
+...
