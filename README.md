@@ -68,4 +68,67 @@
    password_encryption = scram-sha-256
    include_dir = 'conf.d'
    ```
+   - Подготовка на обоих хостах конфигурационного файла /etc/postgresql/14/main/pg_hba.conf:
+   ```shell
+   # Database administrative login by Unix domain socket
+   local   all             postgres                                peer
+   # TYPE  DATABASE        USER            ADDRESS                 METHOD
+   # "local" is for Unix domain socket connections only
+   local   all             all                                     peer
+   # IPv4 local connections:
+   host    all             all             127.0.0.1/32            scram-sha-256
+   # IPv6 local connections:
+   host    all             all             ::1/128                 scram-sha-256
+   # Allow replication connections from localhost, by a user with the
+   # replication privilege.
+   local   replication     all                                     peer
+   host    replication     all             127.0.0.1/32            scram-sha-256
+   host    replication     all             ::1/128                 scram-sha-256
+   host    replication     replicator      192.168.56.11/32        scram-sha-256
+   host    replication     replicator      192.168.56.12/32        scram-sha-256
+   host    all             barman          192.168.56.13/32        scram-sha-256
+   host    replication     barman          192.168.56.13/32        scram-sha-256
+   ```
+   - Перезапуск сервиса postgresql на обоих хостах:
+   ```shell
+   systemctl restart postgresql
+   ```
+   - Удаление на хосте node2 содержимого /var/lib/postgresql/14/main/ и копирование по этому пути данных с хоста node1 с использованием утилиты pg_basebackup (настройка репликации):
+   ```shell
+   root@node2:~ systemctl stop postgresql
+   root@node2:~ rm -rf /var/lib/postgresql/14/main/*
+   root@node2:~ pg_basebackup -h 192.168.56.11 -U  replicator -D  /var/lib/postgresql/14/main/ -R -P
+   root@node2:~ systemctl start postgresql
+   ```
+   - Для проверки работы репликации, на хосте node1 создаётся таблица, которая, в случае правильной настройки, появляется на хосте node2:
+   ```shell
+   (node1)
+   postgres=# CREATE DATABASE otus;
+   CREATE DATABASE
+   postgres=# \l
+                                 List of databases
+      Name    |  Owner   | Encoding | Collate |  Ctype  |   Access privileges   
+   -----------+----------+----------+---------+---------+-----------------------
+    otus      | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    postgres  | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    template0 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+    template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+   (4 rows)
+
+   (node2)
+   postgres=# \l
+                                 List of databases
+      Name    |  Owner   | Encoding | Collate |  Ctype  |   Access privileges         
+   -----------+----------+----------+---------+---------+-----------------------
+    otus      | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    postgres  | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    template0 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+    template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+   (4 rows)
+
+   ```
 
