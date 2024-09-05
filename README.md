@@ -9,8 +9,8 @@
 &ensp;&ensp;&ensp;Ansible (https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html).<br/>
 &ensp;&ensp;Все действия проводились с использованием Vagrant 2.4.0, VirtualBox 7.0.18, Ansible 9.4.0, образа ubuntu/jammy64 версии 20240301.0.0.<br/>
 ### Ход решения ###
-1. Установка и настройка postgresql на хостах node1 и node2:
-   - Установка необходимого ПО postgresql на обоих хостах:
+1. Настройка hot-standby репликации с использованием слотов:
+   - Установка необходимого ПО postgresql на хостах node1 и node2:
    ```shell
    apt install postgresql postgresql-contrib
    systemctl enable --now postgresql
@@ -93,7 +93,7 @@
    ```shell
    systemctl restart postgresql
    ```
-   - Удаление на хосте node2 содержимого /var/lib/postgresql/14/main/ и копирование по этому пути данных с хоста node1 с использованием утилиты pg_basebackup (настройка репликации):
+   - Удаление на хосте node2 содержимого /var/lib/postgresql/14/main/ и копирование по этому пути данных с хоста node1 с использованием утилиты pg_basebackup (запуск репликации):
    ```shell
    root@node2:~ systemctl stop postgresql
    root@node2:~ rm -rf /var/lib/postgresql/14/main/*
@@ -129,6 +129,6 @@
     template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
               |          |          |         |         | postgres=CTc/postgres
    (4 rows)
-
    ```
+2. 
 
