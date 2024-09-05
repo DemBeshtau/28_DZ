@@ -265,3 +265,4 @@
               |          |          |         |         | postgres=CTc/postgres
    (4 rows)
    ```
+&ensp;&ensp;Для автоматического конфигурирования инфраструктуры с помощью Ansible, подготовлен плейбук playbook.yml.
