@@ -9,7 +9,7 @@
 &ensp;&ensp;&ensp;Ansible (https://docs.ansible.com/ansible/latest/installation_guide/intro_installation.html).<br/>
 &ensp;&ensp;Все действия проводились с использованием Vagrant 2.4.0, VirtualBox 7.0.18, Ansible 9.4.0, образа ubuntu/jammy64 версии 20240301.0.0.<br/>
 ### Ход решения ###
-1. Настройка hot-standby репликации с использованием слотов:
+### 1. Настройка hot-standby репликации с использованием слотов
    - Установка необходимого ПО postgresql на хостах node1 и node2:
    ```shell
    apt install postgresql postgresql-contrib
@@ -95,10 +95,10 @@
    ```
    - Удаление на хосте node2 содержимого /var/lib/postgresql/14/main/ и копирование по этому пути данных с хоста node1 с использованием утилиты pg_basebackup (запуск репликации):
    ```shell
-   root@node2:~ systemctl stop postgresql
-   root@node2:~ rm -rf /var/lib/postgresql/14/main/*
-   root@node2:~ pg_basebackup -h 192.168.56.11 -U  replicator -D  /var/lib/postgresql/14/main/ -R -P
-   root@node2:~ systemctl start postgresql
+   root@node2:~# systemctl stop postgresql
+   root@node2:~# rm -rf /var/lib/postgresql/14/main/*
+   root@node2:~# pg_basebackup -h 192.168.56.11 -U  replicator -D  /var/lib/postgresql/14/main/ -R -P
+   root@node2:~# systemctl start postgresql
    ```
    - Для проверки работы репликации, на хосте node1 создаётся таблица, которая, в случае правильной настройки, появляется на хосте node2:
    ```shell
@@ -130,5 +130,66 @@
               |          |          |         |         | postgres=CTc/postgres
    (4 rows)
    ```
-2. 
+### 2. Настройка резервного копирования
+   - Установка для резервного копирования утилиты Barman:
+   ```shell
+   root@barman:~# apt install barman-cli barman postgresql
+   ```
+   - Генерирование на хостах node1 и barman ssh-ключей для пользователей postgres и barman соответственно с помощью команды ```ssh-keygen -t rsa -b 4096```.
+   - Копирование публичных ключей указанных хостов в соответствующие файлы authorized_keys.
+   - Создание на node1 в postgresql пользователя barman с соответствующими правами:
+   ```shell
+   CREATE USER barman WITH REPLICATION Encrypted PASSWORD 'Otus2024!';
+   ```
+   - Добавление изменений в конфигурационный файл pg_hba.conf хоста node1:
+   ```shell
+   ...
+   host    all                 barman       192.168.56.13/32      scram-sha-256
+   host    replication         barman       192.168.56.13/32      scram-sha-256
+   ```
+   - Подготовка на хосте barman необходимых конфигурационных файлов для подключения к БД:
+   ```shell
+   barman@barman:~$ cat .pgpass 
+   192.168.56.11:5432:*:barman:Otus2024!
 
+   root@barman:~# cat /etc/barman.conf 
+   [barman]
+   barman_home = /var/lib/barman
+   configuration_files_directory = /etc/barman.d
+   barman_user = barman
+   log_file = /var/log/barman/barman.log
+   compression = gzip
+   backup_method = rsync
+   archiver = on
+   retention_policy = REDUNDANCY 3
+   immediate_checkpoint = true
+   last_backup_maximum_age = 4 DAYS
+   minimum_redundancy = 1
+
+   root@barman:~# cat /etc/barman.d/node1.conf 
+   [node1]
+   description = "backup node1"
+   active = on
+   ssh_command = ssh postgres@192.168.56.11
+   conninfo = host=192.168.56.11 user=barman port=5432 dbname=postgres
+   retention_policy_mode = auto
+   retention_policy = RECOVERY WINDOW OF 7 days
+   wal_retention_policy = main
+   streaming_archiver=on
+   path_prefix = /usr/pgsql-14/bin/
+   create_slot = auto
+   slot_name = node1
+   streaming_conninfo = host=192.168.56.11 user=barman 
+   backup_method = postgres
+   archiver = off
+   ```
+   - Запуск резервного копирования на хосте barman:
+   ```shell
+   barman switch-wal node1
+   barman cron
+   barman backup node1
+   ```
+   - Проверка работоспособности конфигурации:
+   ```shell
+   
+   ```
