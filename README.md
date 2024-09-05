@@ -191,5 +191,77 @@
    ```
    - Проверка работоспособности конфигурации:
    ```shell
+   (node1)
+   postgres=# \l
+                                 List of databases
+      Name    |  Owner   | Encoding | Collate |  Ctype  |   Access privileges   
+   -----------+----------+----------+---------+---------+-----------------------
+    otus      | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    postgres  | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    template0 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+    template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+   (4 rows)
+   postgres=# DROP DATABASE otus;
+   DROP DATABASE
+   postgres=# \l
+                                 List of databases
+      Name    |  Owner   | Encoding | Collate |  Ctype  |   Access privileges   
+   -----------+----------+----------+---------+---------+-----------------------
+    postgres  | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    template0 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+    template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+   (3 rows)
+
+   (barman)
+   root@barman:~# barman list-backup node1
+   node1 20240905T152330 - Thu Sep  5 12:23:31 2024 - Size: 33.6 MiB - WAL Size: 0 B - WAITING_FOR_WALS
    
+   root@barman:~# barman recover node1 20240905T152330 /var/lib/postgresql/14/main --remote-ssh-command "ssh postgres@192.168.56.11"
+   The authenticity of host '192.168.56.11 (192.168.56.11)' can't be established.
+   ED25519 key fingerprint is SHA256:YTm5V7Ir4kBME/Zvij3DSN9uCYcN8KRwhoKmdYCCGIw.
+   This key is not known by any other names
+   Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+   Starting remote restore for server node1 using backup 20240905T152330
+   Destination directory: /var/lib/postgresql/14/main
+   Remote command: ssh postgres@192.168.56.11
+   Using safe horizon time for smart rsync copy: 2024-09-04 16:15:27.297790-03:00
+   Copying the base backup.
+   Copying required WAL segments.
+   Generating archive status files
+   Identify dangerous settings in destination directory.
+
+   WARNING
+   The following configuration files have not been saved during backup, hence they have not been restored.
+   You need to manually restore them in order to start the recovered PostgreSQL instance:
+
+       postgresql.conf
+       pg_hba.conf
+       pg_ident.conf
+
+   Recovery completed (start time: 2024-09-05 15:28:10.869232, elapsed time: 10 seconds)
+
+   Your PostgreSQL server has been successfully prepared for recovery!
+
+   (node1)
+   root@node1:~# systemctl restart postgresql
+   root@node1:~# sudo -u postgres psql
+   could not change directory to "/root": Permission denied
+   psql (14.13 (Ubuntu 14.13-0ubuntu0.22.04.1))
+   Type "help" for help.
+
+   postgres=# \l
+                                 List of databases
+      Name    |  Owner   | Encoding | Collate |  Ctype  |   Access privileges   
+   -----------+----------+----------+---------+---------+-----------------------
+    otus      | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    postgres  | postgres | UTF8     | C.UTF-8 | C.UTF-8 | 
+    template0 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+    template1 | postgres | UTF8     | C.UTF-8 | C.UTF-8 | =c/postgres          +
+              |          |          |         |         | postgres=CTc/postgres
+   (4 rows)
    ```
